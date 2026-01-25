@@ -131,6 +131,111 @@ Configuration is stored in `~/.prismcast/config.json` and your TV provider sessi
 
 **Linux and Windows** have built-in support (including service installation), but these platforms are not actively tested. If you'd like to use PrismCast on Linux or Windows, you're welcome to try it, but please understand that you may encounter issues that haven't been discovered yet. Bug reports and pull requests for these platforms are always appreciated!
 
+## Docker / Container Deployment
+
+> **Note:** Docker deployment is untested. The following guidance is based on the requirements of the underlying technologies (Chrome, Puppeteer) and the approach used by similar projects like [Chrome Capture for Channels](https://github.com/fancybits/chrome-capture-for-channels). Feedback and contributions welcome!
+
+PrismCast can run in a Docker container, but requires some specific configuration because it needs a browser with a display.
+
+### Requirements
+
+- **Google Chrome** (not Chromium) - PrismCast uses Chrome-specific APIs for media capture
+- **Virtual display** - Chrome needs a display; use Xvfb or expose VNC for remote access
+- **Shared memory** - Chrome requires adequate shared memory (`--shm-size=1g` recommended)
+- **Persistent storage** - Mount a volume for `~/.prismcast` to preserve TV provider logins across container restarts
+
+### Example Dockerfile
+
+```dockerfile
+FROM node:22-slim
+
+# Install Chrome and Xvfb
+RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg \
+    xvfb \
+    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y google-chrome-stable \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PrismCast
+RUN npm install -g prismcast
+
+# Set Chrome path
+ENV CHROME_BIN=/usr/bin/google-chrome-stable
+
+# Expose the web interface
+EXPOSE 5589
+
+# Run with virtual framebuffer
+CMD ["xvfb-run", "--auto-servernum", "--server-args=-screen 0 1920x1080x24", "prismcast"]
+```
+
+### Running the Container
+
+```bash
+docker run -d \
+  --name prismcast \
+  --shm-size=1g \
+  -p 5589:5589 \
+  -v prismcast-data:/root/.prismcast \
+  your-prismcast-image
+```
+
+### Authentication Considerations
+
+TV provider authentication requires interacting with the Chrome browser. Options include:
+
+1. **VNC access** - Add a VNC server to your container and expose port 5900 for remote desktop access during login
+2. **Pre-authenticated volume** - Authenticate on a local machine, then copy the `~/.prismcast/chromedata` directory into your container volume
+3. **X11 forwarding** - Forward the display to your local machine during initial setup
+
+### Display Resolution
+
+The Xvfb resolution must match or exceed your configured quality preset:
+
+| Preset | Minimum Xvfb Resolution |
+|--------|------------------------|
+| 480p | 854x480 |
+| 720p / 720p High | 1280x720 |
+| 1080p / 1080p High | 1920x1080 |
+| 4K | 3840x2160 |
+
+### Environment Variables
+
+PrismCast can be configured entirely via environment variables, which is ideal for containerized deployments:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | 5589 | HTTP server port |
+| `HOST` | 0.0.0.0 | HTTP server bind address |
+| `CHROME_BIN` | (auto) | Path to Chrome executable |
+| `QUALITY_PRESET` | 720p-high | Video quality: 480p, 720p, 720p-high, 1080p, 1080p-high, 4k |
+| `VIDEO_BITRATE` | 12000000 | Video bitrate in bps |
+| `AUDIO_BITRATE` | 256000 | Audio bitrate in bps |
+| `FRAME_RATE` | 60 | Target frame rate |
+| `CAPTURE_MODE` | ffmpeg | Capture mode: "ffmpeg" (more stable) or "native" |
+| `HLS_SEGMENT_DURATION` | 2 | HLS segment duration in seconds |
+| `HLS_MAX_SEGMENTS` | 10 | Maximum segments kept in memory per stream |
+| `HLS_IDLE_TIMEOUT` | 30000 | Idle stream timeout in milliseconds |
+| `MAX_CONCURRENT_STREAMS` | 10 | Maximum simultaneous streams |
+
+Example with environment variables:
+
+```bash
+docker run -d \
+  --name prismcast \
+  --shm-size=1g \
+  -p 5589:5589 \
+  -v prismcast-data:/root/.prismcast \
+  -e QUALITY_PRESET=1080p \
+  -e VIDEO_BITRATE=15000000 \
+  -e MAX_CONCURRENT_STREAMS=5 \
+  your-prismcast-image
+```
+
 ## Contributing
 
 Contributions are welcome! Whether it's bug reports, feature requests, new channel definitions, or pull requests, I appreciate your interest in improving PrismCast. If you've got a streaming site that works well with PrismCast, consider submitting a pull request to add it to the preconfigured channels.
