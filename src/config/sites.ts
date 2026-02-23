@@ -308,6 +308,20 @@ export const SITE_PROFILES: Record<string, SiteProfile> = {
     summary: "Static pages (no video)"
   },
 
+  // Profile for DirecTV Stream (stream.directv.com) live channel guide. The guide renders channel logos as background-image divs in a scrollable grid. Clicking
+  // a tile opens a mini-guide overlay containing a circular play button identified by aria-label^="on now,". The channelSelector is the channel's resourceId
+  // (UUID) from the DirecTV Stream API, matched against the background-image URL of the channel logo div. Uses selectReadyVideo because the guide page contains
+  // multiple video elements. Note: DirecTV Stream enforces a single concurrent stream per account.
+  directvStream: {
+
+    category: "multiChannel",
+    channelSelection: { matchSelector: "[style*=\"{channel}\"]", playSelector: "[aria-label^=\"on now,\"]", strategy: "tileClick" },
+    description: "DirecTV Stream live channel guide. Set Channel Selector to the channel's resourceId (UUID) to match the channel logo background-image URL.",
+    extends: "fullscreenApi",
+    selectReadyVideo: true,
+    summary: "DirecTV Stream (tile + play button, needs resourceId)"
+  },
+
   // Profile for YouTube TV (tv.youtube.com/live). The guide grid renders all ~256 channel rows in the DOM simultaneously (no virtualization), each containing a
   // direct watch URL. The youtubeGrid strategy performs a single querySelector to find the target channel's watch link via aria-label, extracts the URL, and
   // navigates directly — no scrolling, clicking, or timing workarounds needed. Uses selectReadyVideo because the watch page has ~36 video elements (live preview
@@ -377,6 +391,8 @@ export const DOMAIN_CONFIG: Record<string, DomainConfig> = {
   "fox.com": { loginUrl: "https://www.fox.com", profile: "foxLive", provider: "Fox", providerTag: "foxcom" },
   "foxbusiness.com": { profile: "embeddedDynamicMultiVideo", provider: "Fox Business" },
   "foxnews.com": { profile: "embeddedDynamicMultiVideo", provider: "Fox News" },
+  "directv.com": { profile: "directvStream", provider: "DirecTV Stream", providerTag: "directvstream" },
+  "stream.directv.com": { profile: "directvStream", provider: "DirecTV Stream", providerTag: "directvstream" },
   "foxsports.com": { profile: "fullscreenApi", provider: "Fox Sports" },
   "france24.com": { profile: "embeddedVolumeLock", provider: "France 24" },
   "fyi.tv": { profile: "fullscreenApi", provider: "FYI" },
